@@ -171,33 +171,18 @@ export const removeImageBackground = async (req, res) => {
       });
     }
 
-    // ✅ Create FormData and append prompt
-    const form = new FormData();
-    form.append("prompt", prompt);
-
-    // ✅ Send request to ClipDrop API
-    const { data } = await axios.post(
-      "https://clipdrop-api.co/text-to-image/v1",
-      form,
-      {
-        headers: {
-          "x-api-key": process.env.CLIPDROP_API_KEY,
-          ...form.getHeaders(),
-        },
-        responseType: "arraybuffer",
-      }
-    );
-
-    // ✅ Convert binary data to base64
-    const base64Image = `data:image/png;base64,${Buffer.from(data, "binary").toString("base64")}`;
-
     // ✅ Upload to Cloudinary
-    const { secure_url } = await cloudinary.uploader.upload(base64Image);
+    const { secure_url } = await cloudinary.uploader.upload(image.path ,{
+        transformation:[{
+            effect:'background_removel',
+            background_removel :'remove_the_background'
+        }]
+    });
 
     // ✅ Insert into database
     await sql`
-      INSERT INTO creations(user_id, prompt, content, type, publish)
-      VALUES(${userId}, ${prompt}, ${secure_url}, 'image', ${publish ?? false})
+      INSERT INTO creations(user_id, prompt, content, type)
+      VALUES(${userId}, 'Remove background from image', ${secure_url}, 'image')
     `;
 
     res.json({ success: true, content: secure_url });
@@ -206,3 +191,71 @@ export const removeImageBackground = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
+export const removeImageObject = async (req, res) => {
+  try {
+    const { userId } = req.auth();
+    const { object } = req.body;   
+    const {image} = req.file;
+    const plan = req.plan;
+
+    if (plan !== "premium") {
+      return res.json({
+        success: false,
+        message: "This feature is only available for premium subscriptions",
+      });
+    }
+
+    // ✅ Upload to Cloudinary
+    const { public_id } = await cloudinary.uploader.upload(image.path );
+
+    const imageUrl = cloudinary.url(public_id , {
+        transformation:[{effect: `gen_remove:${object}`}],
+        resource_type:'image'
+    })
+    // ✅ Insert into database
+    await sql`
+      INSERT INTO creations(user_id, prompt, content, type)
+      VALUES(${userId},${`Remove ${object} from image`} , ${imageUrl}, 'image')
+    `;
+
+    res.json({ success: true, content: imageUrl });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+export const resumeReview = async (req, res) => {
+  try {
+    const { userId } = req.auth(); 
+    const resume  = req.file;
+    const plan = req.plan;
+
+    if (plan !== "premium") {
+      return res.json({
+        success: false,
+        message: "This feature is only available for premium subscriptions",
+      });
+    }
+
+    // ✅ Upload to Cloudinary
+    const { public_id } = await cloudinary.uploader.upload(image.path );
+
+    const imageUrl = cloudinary.url(public_id , {
+        transformation:[{effect: `gen_remove:${object}`}],
+        resource_type:'image'
+    })
+    // ✅ Insert into database
+    await sql`
+      INSERT INTO creations(user_id, prompt, content, type)
+      VALUES(${userId},${`Remove ${object} from image`} , ${imageUrl}, 'image')
+    `;
+
+    res.json({ success: true, content: imageUrl });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
