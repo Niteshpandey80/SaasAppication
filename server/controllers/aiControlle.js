@@ -4,6 +4,8 @@ import { clerkClient } from "@clerk/express";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
 import FormData from "form-data";
+import fs from 'fs'
+import pdf from 'pdf-parse/lib/pdf-parse.js'
 
 // Initialize OpenAI (Gemini-style endpoint)
 const AI = new OpenAI({
@@ -239,13 +241,13 @@ export const resumeReview = async (req, res) => {
       });
     }
 
-    // ✅ Upload to Cloudinary
-    const { public_id } = await cloudinary.uploader.upload(image.path );
+    if(resume.size > 5 * 1024 * 1024){
+      return res.json({success:false , message: "Resume file size exceed allowed size (5MB)."})
+    }
+    const dataBuffer = fs.readFileSync(resume.path) 
+    const pdfData = await pdf(dataBuffer)
+    const prompt = `Review the following resume and provide contructive feedback on its strengths , weaknessses , and ares for improvement. Resume Content:\n\n${pdfData.text}`
 
-    const imageUrl = cloudinary.url(public_id , {
-        transformation:[{effect: `gen_remove:${object}`}],
-        resource_type:'image'
-    })
     // ✅ Insert into database
     await sql`
       INSERT INTO creations(user_id, prompt, content, type)
